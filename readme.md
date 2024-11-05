@@ -26,16 +26,20 @@ Every result of a query is a list of HtqlNode or an empty list.
 
 The select statement is used to query data from html structures. The syntax is as follows:
 
-- SELECT * FROM document;
-- SELECT p,div,h2 FROM document;
-- SELECT * FROM document WHERE attributes.class = 'title';
-- SELECT * FROM document WHERE attributes IS NOT NULL;
-- SELECT * FROM document WHERE attributes.class = 'title' OR attributes.id = 'content';
-- SELECT span FROM document WHERE attributes.class = 'title' AND attributes.id = 'content';
-- SELECT span FROM document WHERE attributes.class = 'title' AND NOT attributes.id = 'content';
+```
+- SELECT * FROM document
+- SELECT p,div,h2 FROM document
+- SELECT * FROM document WHERE attributes.class = 'title'
+- SELECT * FROM document WHERE attributes IS NOT NULL
+- SELECT * FROM document WHERE attributes.class = 'title' OR attributes.id = 'content'
+- SELECT span FROM document WHERE attributes.class = 'title' AND attributes.id = 'content'
+- SELECT span FROM document WHERE attributes.class = 'title' AND NOT attributes.id = 'content'
+```
 
-### Select from remote
+### Select from remote URL
 
 HTQL can be used to query data from remote html structures. The syntax is as follows:
 
-- SELECT p,div,h2 FROM https://example.com;
+```
+- SELECT p,div,h2 FROM https://example.com
+```

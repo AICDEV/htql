@@ -11,35 +11,35 @@ import java.io.File
 import kotlin.system.exitProcess
 
 
+val urlPattern = Regex("(http|https)://[a-zA-Z0-9_.-]+(:[0-9]+)?(/[a-zA-Z0-9_.-/?&%#=]*)?")
+
 fun main() {
     println("welcome to HTQL - HYPER TEXT QUERY LANGUAGE")
 
     println("Please enter your HTQL query:")
 
-    val test = readlnOrNull() ?: exitProcess(1)
+    val expression = readlnOrNull() ?: exitProcess(1)
 
-    val urlPattern = Regex("(http|https)://[a-zA-Z0-9_.-]+(:[0-9]+)?(/[a-zA-Z0-9_.-/?&%#=]*)?")
+    evaluateDocument(expression) { document ->
+        val lexer = HtqlLexer(CharStreams.fromString(expression))
+        val tokens = CommonTokenStream(lexer)
+        val parser = HtqlParser(tokens)
+        val tree = parser.query()
 
-    var document: Document
-    val urlMatch = urlPattern.find(test)
+
+        val visitor = HtqlRuntimeVisitor(document = document)
+        val nodes = visitor.visit(tree)
+
+        println(nodes)
+    }
+}
+
+fun evaluateDocument(expression: String, block: (document: Document) -> Unit) {
+    val urlMatch = urlPattern.find(expression)
     if (urlMatch != null) {
         val url = urlMatch.value
-        document = Jsoup.connect(url).get()
+        block(Jsoup.connect(url).get())
     } else {
-        document = Jsoup.parse(File("app/src/main/resources/test.html"))
-    }
-
-    val lexer = HtqlLexer(CharStreams.fromString(test))
-    val tokens = CommonTokenStream(lexer)
-    val parser = HtqlParser(tokens)
-    val tree = parser.query()
-
-
-    val visitor = HtqlRuntimeVisitor(document = document)
-    val nodes = visitor.visit(tree)
-
-
-    nodes.forEach {
-        println(it.type)
+        block(Jsoup.parse(File("app/src/main/resources/test.html")))
     }
 }
