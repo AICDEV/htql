@@ -36,12 +36,16 @@ func (v *HtqlRuntimeVisitor) VisitQuery(ctx *htql.QueryContext) interface{} {
 
 	nodes := v.Visit(ctx.SelectStmt())
 
+	if whereCtx := ctx.WhereStmt(); whereCtx != nil {
+		v.VisitWhereStmt(whereCtx.(*htql.WhereStmtContext))
+	}
+
 	return nodes
 }
 
 func (v *HtqlRuntimeVisitor) VisitSelectStmt(ctx *htql.SelectStmtContext) interface{} {
 
-	nodes := []HtqlNode{}
+	var nodes []HtqlNode
 
 	if ctx.ElementList() != nil {
 
@@ -64,6 +68,14 @@ func (v *HtqlRuntimeVisitor) VisitSelectStmt(ctx *htql.SelectStmtContext) interf
 
 func (v *HtqlRuntimeVisitor) VisitWhereStmt(ctx *htql.WhereStmtContext) interface{} {
 	return v.Visit(ctx.ConditionExpr())
+}
+
+func (v *HtqlRuntimeVisitor) VisitConditionExpr(ctx *htql.ConditionExprContext) interface{} {
+	return nil
+}
+
+func (v *HtqlRuntimeVisitor) VisitCondition(ctx *htql.ConditionContext) interface{} {
+	return nil
 }
 
 func (v *HtqlRuntimeVisitor) VisitElementList(ctx *htql.ElementListContext) interface{} {
