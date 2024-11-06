@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/antlr4-go/antlr/v4"
 	htql "htql/htql_parser_go"
@@ -81,14 +80,16 @@ func (v *HtqlRuntimeVisitor) VisitConditionExpr(ctx *htql.ConditionExprContext) 
 }
 
 func (v *HtqlRuntimeVisitor) VisitCondition(ctx *htql.ConditionContext) interface{} {
-	fmt.Println("visit condition self")
 	attributeExpr := ctx.AttributeExpr().IDENTIFIER().GetText()
 	valueExpr := ctx.AttributeExpr().STRING().GetText()
 
-	fmt.Println(attributeExpr)
-	fmt.Println(valueExpr)
+	var nodes []HtqlNode
 
-	return nil
+	v.document.Find("[" + attributeExpr + "=" + valueExpr + "]").Each(func(i int, element *goquery.Selection) {
+		nodes = append(nodes, v.elementToHtqlNode(element))
+	})
+
+	return nodes
 }
 
 func (v *HtqlRuntimeVisitor) VisitElementList(ctx *htql.ElementListContext) interface{} {
