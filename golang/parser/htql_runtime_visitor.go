@@ -116,6 +116,12 @@ func (v *HtqlRuntimeVisitor) VisitConditionExpr(ctx *htql.ConditionExprContext) 
 }
 
 func (v *HtqlRuntimeVisitor) VisitCondition(ctx *htql.ConditionContext) interface{} {
+
+	if ctx.NOT() != nil {
+		return []HtqlNode{}
+
+	}
+
 	attributeExpr := ctx.AttributeExpr().IDENTIFIER().GetText()
 	valueExpr := ctx.AttributeExpr().STRING().GetText()
 
@@ -193,16 +199,13 @@ func intersect(left []HtqlNode, right []HtqlNode) []HtqlNode {
 func union(left []HtqlNode, right []HtqlNode) []HtqlNode {
 	nodeMap := make(map[string]map[string]string)
 
-	// Add all nodes from the left side to the map
 	for _, node := range left {
 		key := node.Type
 		nodeMap[key] = node.Attributes
 	}
 
-	// Add nodes from the right side that are not already in the map
 	for _, node := range right {
 		key := node.Type
-		// If the node type is not in the map or if the attributes differ, add it to the left slice
 		if existingAttrs, exists := nodeMap[key]; !exists || !equalAttributes(existingAttrs, node.Attributes) {
 			left = append(left, node)
 			nodeMap[key] = node.Attributes

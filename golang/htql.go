@@ -15,6 +15,7 @@ import (
 )
 
 var urlPattern = regexp.MustCompile(`(http|https)://[a-zA-Z0-9_.-]+(:[0-9]+)?(/[a-zA-Z0-9_.-/?&%#=]*)?`)
+var fromPattern = regexp.MustCompile(`(?i)\bFROM\s+([^\s]+)`)
 
 func main() {
 	expression := flag.String("query", "", "HTQL query")
@@ -61,16 +62,22 @@ func evaluateDocument(expression string, block func(document *goquery.Document))
 
 		block(doc)
 	} else {
-		file, err := os.Open("./test.html")
-		if err != nil {
-			log.Fatalf("Failed to open file: %v", err)
-		}
-		defer file.Close()
 
-		doc, err := goquery.NewDocumentFromReader(file)
-		if err != nil {
-			log.Fatalf("Failed to parse HTML file: %v", err)
+		if fileMatch := fromPattern.FindStringSubmatch(expression); len(fileMatch) > 0 {
+
+			file, err := os.Open(fileMatch[1])
+			if err != nil {
+				log.Fatalf("Failed to open file: %v", err)
+			}
+			defer file.Close()
+
+			doc, err := goquery.NewDocumentFromReader(file)
+			if err != nil {
+				log.Fatalf("Failed to parse HTML file: %v", err)
+			}
+			block(doc)
+		} else {
+			panic("dont know how to handle this")
 		}
-		block(doc)
 	}
 }
