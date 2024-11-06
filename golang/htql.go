@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
@@ -30,9 +31,13 @@ func main() {
 		tree := parser.Query()
 
 		visitor := parser2.NewHtqlRuntimeVisitor(document)
-		nodes := visitor.Visit(tree)
+		nodes := visitor.Visit(tree).([]parser2.HtqlNode)
 
-		fmt.Println(nodes)
+		jsonData, err := json.MarshalIndent(nodes, "", "  ")
+		if err != nil {
+			fmt.Printf("Error marshalling to JSON: %v\n", err)
+		}
+		fmt.Println(string(jsonData))
 	})
 }
 

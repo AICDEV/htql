@@ -5,6 +5,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/antlr4-go/antlr/v4"
 	htql "htql/htql_parser_go"
+	"strings"
 )
 
 type HtqlNode struct {
@@ -34,28 +35,30 @@ func (v *HtqlRuntimeVisitor) Visit(tree antlr.ParseTree) interface{} {
 }
 
 func (v *HtqlRuntimeVisitor) VisitQuery(ctx *htql.QueryContext) interface{} {
-
 	nodes := v.Visit(ctx.SelectStmt()).([]HtqlNode)
 
 	if whereCtx := ctx.WhereStmt(); whereCtx != nil {
-		whereNodes := v.VisitWhereStmt(whereCtx.(*htql.WhereStmtContext))
-		nodeMap := make(map[string]map[string]string)
+		whereNodes := v.VisitWhereStmt(whereCtx.(*htql.WhereStmtContext)).([]HtqlNode)
+		nodeMap := make(map[string][]map[string]string)
 
-		if whereNodes == nil {
-			return []HtqlNode{}
-		}
-
-		for _, node := range whereNodes.([]HtqlNode) {
-			nodeMap[node.Type] = node.Attributes
+		for _, node := range whereNodes {
+			nodeMap[node.Type] = append(nodeMap[node.Type], node.Attributes)
 		}
 
 		var filteredNodes []HtqlNode
 		for _, node := range nodes {
-			if attrs, exists := nodeMap[node.Type]; exists {
-				match := true
-				for key, value := range attrs {
-					if node.Attributes[key] != value {
-						match = false
+			if attrsList, exists := nodeMap[node.Type]; exists {
+				match := false
+				for _, attrs := range attrsList {
+					matches := true
+					for key, value := range attrs {
+						if node.Attributes[key] != value {
+							matches = false
+							break
+						}
+					}
+					if matches {
+						match = true
 						break
 					}
 				}
@@ -98,16 +101,14 @@ func (v *HtqlRuntimeVisitor) VisitWhereStmt(ctx *htql.WhereStmtContext) interfac
 }
 
 func (v *HtqlRuntimeVisitor) VisitConditionExpr(ctx *htql.ConditionExprContext) interface{} {
-
 	result := v.VisitCondition(ctx.Condition(0).(*htql.ConditionContext)).([]HtqlNode)
 
 	for i := 1; i < ctx.GetChildCount(); i++ {
-		if condition, ok := ctx.GetChild(i).(*htql.ConditionContext); ok {
-
-			logicalOperationContext := ctx.LogicalOp(i - 1).(*htql.LogicalOpContext)
-			innerResult := v.VisitCondition(condition)
-
-			result = v.applyLogicalOp(logicalOperationContext, result, innerResult)
+		op := ctx.LogicalOp(i - 1)
+		condition := ctx.Condition(i)
+		if condition != nil {
+			innerResult := v.VisitCondition(ctx.Condition(i).(*htql.ConditionContext)).([]HtqlNode)
+			result = v.applyLogicalOp(op.(*htql.LogicalOpContext), result, innerResult)
 		}
 	}
 
@@ -137,8 +138,17 @@ func (v *HtqlRuntimeVisitor) VisitLogicalOp(ctx *htql.LogicalOpContext) interfac
 	return nil
 }
 
-func (v *HtqlRuntimeVisitor) applyLogicalOp(context *htql.LogicalOpContext, result []HtqlNode, result2 interface{}) []HtqlNode {
-	return result
+func (v *HtqlRuntimeVisitor) applyLogicalOp(ctx *htql.LogicalOpContext, left []HtqlNode, right []HtqlNode) []HtqlNode {
+	op := strings.ToUpper(ctx.GetText())
+
+	switch op {
+	case "AND":
+		return intersect(left, right)
+	case "OR":
+		return union(left, right)
+	default:
+		return []HtqlNode{}
+	}
 }
 
 func (v *HtqlRuntimeVisitor) elementToHtqlNode(element *goquery.Selection) HtqlNode {
@@ -160,4 +170,58 @@ func (v *HtqlRuntimeVisitor) elementToHtqlNode(element *goquery.Selection) HtqlN
 		Children:   children,
 		InnerText:  element.Text(),
 	}
+}
+
+func intersect(left []HtqlNode, right []HtqlNode) []HtqlNode {
+	nodeMap := make(map[string]map[string]string)
+	for _, node := range left {
+		key := node.Type
+		nodeMap[key] = node.Attributes
+	}
+
+	var result []HtqlNode
+	for _, node := range right {
+		key := node.Type
+		if existingAttrs, exists := nodeMap[key]; exists && equalAttributes(existingAttrs, node.Attributes) {
+			result = append(result, node)
+		}
+	}
+
+	return result
+}
+
+func union(left []HtqlNode, right []HtqlNode) []HtqlNode {
+	nodeMap := make(map[string]map[string]string)
+
+	// Add all nodes from the left side to the map
+	for _, node := range left {
+		key := node.Type
+		nodeMap[key] = node.Attributes
+	}
+
+	// Add nodes from the right side that are not already in the map
+	for _, node := range right {
+		key := node.Type
+		// If the node type is not in the map or if the attributes differ, add it to the left slice
+		if existingAttrs, exists := nodeMap[key]; !exists || !equalAttributes(existingAttrs, node.Attributes) {
+			left = append(left, node)
+			nodeMap[key] = node.Attributes
+		}
+	}
+
+	return left
+}
+
+func equalAttributes(attrs1, attrs2 map[string]string) bool {
+	if len(attrs1) != len(attrs2) {
+		return false
+	}
+
+	for key, val1 := range attrs1 {
+		if val2, exists := attrs2[key]; !exists || val1 != val2 {
+			return false
+		}
+	}
+
+	return true
 }
