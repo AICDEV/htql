@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/antlr4-go/antlr/v4"
 	htql "htql/htql_parser_go"
@@ -29,10 +30,9 @@ func main() {
 		tree := parser.Query()
 
 		visitor := parser2.NewHtqlRuntimeVisitor(document)
-		//	nodes := visitor.Visit(tree)
-		visitor.Visit(tree)
+		nodes := visitor.Visit(tree)
 
-		//fmt.Println(nodes)
+		fmt.Println(nodes)
 	})
 }
 

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/antlr4-go/antlr/v4"
 	htql "htql/htql_parser_go"
@@ -34,10 +35,36 @@ func (v *HtqlRuntimeVisitor) Visit(tree antlr.ParseTree) interface{} {
 
 func (v *HtqlRuntimeVisitor) VisitQuery(ctx *htql.QueryContext) interface{} {
 
-	nodes := v.Visit(ctx.SelectStmt())
+	nodes := v.Visit(ctx.SelectStmt()).([]HtqlNode)
 
 	if whereCtx := ctx.WhereStmt(); whereCtx != nil {
-		v.VisitWhereStmt(whereCtx.(*htql.WhereStmtContext))
+		whereNodes := v.VisitWhereStmt(whereCtx.(*htql.WhereStmtContext))
+		nodeMap := make(map[string]map[string]string)
+
+		if whereNodes == nil {
+			return []HtqlNode{}
+		}
+
+		for _, node := range whereNodes.([]HtqlNode) {
+			nodeMap[node.Type] = node.Attributes
+		}
+
+		var filteredNodes []HtqlNode
+		for _, node := range nodes {
+			if attrs, exists := nodeMap[node.Type]; exists {
+				match := true
+				for key, value := range attrs {
+					if node.Attributes[key] != value {
+						match = false
+						break
+					}
+				}
+				if match {
+					filteredNodes = append(filteredNodes, node)
+				}
+			}
+		}
+		nodes = filteredNodes
 	}
 
 	return nodes
@@ -71,12 +98,20 @@ func (v *HtqlRuntimeVisitor) VisitWhereStmt(ctx *htql.WhereStmtContext) interfac
 }
 
 func (v *HtqlRuntimeVisitor) VisitConditionExpr(ctx *htql.ConditionExprContext) interface{} {
-	for i := 0; i < ctx.GetChildCount(); i++ {
+
+	result := v.VisitCondition(ctx.Condition(0).(*htql.ConditionContext)).([]HtqlNode)
+
+	for i := 1; i < ctx.GetChildCount(); i++ {
 		if condition, ok := ctx.GetChild(i).(*htql.ConditionContext); ok {
-			v.VisitCondition(condition)
+
+			logicalOperationContext := ctx.LogicalOp(i - 1).(*htql.LogicalOpContext)
+			innerResult := v.VisitCondition(condition)
+
+			result = v.applyLogicalOp(logicalOperationContext, result, innerResult)
 		}
 	}
-	return nil
+
+	return result
 }
 
 func (v *HtqlRuntimeVisitor) VisitCondition(ctx *htql.ConditionContext) interface{} {
@@ -85,7 +120,9 @@ func (v *HtqlRuntimeVisitor) VisitCondition(ctx *htql.ConditionContext) interfac
 
 	var nodes []HtqlNode
 
-	v.document.Find("[" + attributeExpr + "=" + valueExpr + "]").Each(func(i int, element *goquery.Selection) {
+	selector := fmt.Sprintf("[%s=%s]", attributeExpr, valueExpr)
+
+	v.document.Find(selector).Each(func(i int, element *goquery.Selection) {
 		nodes = append(nodes, v.elementToHtqlNode(element))
 	})
 
@@ -94,6 +131,14 @@ func (v *HtqlRuntimeVisitor) VisitCondition(ctx *htql.ConditionContext) interfac
 
 func (v *HtqlRuntimeVisitor) VisitElementList(ctx *htql.ElementListContext) interface{} {
 	return v.VisitChildren(ctx)
+}
+
+func (v *HtqlRuntimeVisitor) VisitLogicalOp(ctx *htql.LogicalOpContext) interface{} {
+	return nil
+}
+
+func (v *HtqlRuntimeVisitor) applyLogicalOp(context *htql.LogicalOpContext, result []HtqlNode, result2 interface{}) []HtqlNode {
+	return result
 }
 
 func (v *HtqlRuntimeVisitor) elementToHtqlNode(element *goquery.Selection) HtqlNode {
